@@ -24,7 +24,7 @@ handle 28 sequences of 28 steps for every sample.
 
 # Training Parameters
 learning_rate = 0.001
-training_steps = 30000
+training_steps = 10000
 batch_size = 128
 display_step = 100
 
@@ -33,6 +33,7 @@ num_input = 28 # MNIST data input (img shape: 28*28)
 timesteps = 28 # timesteps
 num_hidden = 128 # hidden layer num of features
 num_classes = 10 # MNIST total classes (0-9 digits)
+lstm_layers = 1
 
 # tf Graph input
 X = tf.placeholder("float", [None, timesteps, num_input])
@@ -56,11 +57,11 @@ def RNN(x, weights, biases):
     # Unstack to get a list of 'timesteps' tensors of shape (batch_size, n_input)
     x = tf.unstack(x, timesteps, 1)
 
-    # Define a lstm cell with tensorflow
-    #lstm_cell = tf.nn.rnn_cell.LSTMCell(num_hidden, forget_bias=1.0)
-    lstm_cell = sru.SRUCell(num_hidden)
-    cell_stack = lstm_cell
-    #cell_stack = tf.nn.rnn_cell.MultiRNNCell([lstm_cell]*1, state_is_tuple=True)
+    # Define a lstm cell with tensorflow    
+    #rnn_cell = tf.nn.rnn_cell.LSTMCell(num_hidden, forget_bias=1.0)
+    rnn_cell = sru.SRUCell(num_hidden, False)
+
+    cell_stack = tf.nn.rnn_cell.MultiRNNCell([rnn_cell]*lstm_layers, state_is_tuple=True)
 
     # Get lstm cell output
     outputs, states = tf.nn.rnn(cell_stack, x, dtype=tf.float32)
@@ -74,7 +75,7 @@ prediction = tf.nn.softmax(logits)
 # Define loss and optimizer
 loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
     logits=logits, labels=Y))
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train_op = optimizer.minimize(loss_op)
 
 # Evaluate model (with test logits, for dropout to be disabled)
