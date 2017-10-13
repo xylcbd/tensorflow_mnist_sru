@@ -1,5 +1,5 @@
 # tensorflow_mnist_sru
-tensorflow mnist SRU example
+a naive tensorflow mnist SRU example, speed is not optimized.
 
 # usage
 ```python
