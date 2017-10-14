@@ -34,7 +34,7 @@ class SRUCell(RNNCell):
             b_r = tf.get_variable('b_r', [self._num_units])
 
             xh = tf.matmul(x, W_u)
-            z, f, r = tf.split(1, 3, xh)            
+            z, f, r = tf.split(xh, 3, 1)            
 
             f = tf.sigmoid(f + b_f)
             r = tf.sigmoid(r + b_r)            
@@ -54,7 +54,7 @@ class SRUCell(RNNCell):
             b_r = tf.get_variable('b_r', [self._num_units])
 
             xh = tf.matmul(x, W_u)
-            z, f, r, x = tf.split(1, 4, xh)            
+            z, f, r, x = tf.split(xh, 4, 1)            
 
             f = tf.sigmoid(f + b_f)
             r = tf.sigmoid(r + b_r)            

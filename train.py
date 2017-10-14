@@ -4,6 +4,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import sru
 import time
 import os
+import sys
 import numpy as np
 
 ######################################
@@ -34,7 +35,8 @@ class Network(object):
         self.num_hidden = 128 # hidden layer num of features
         self.num_classes = 10 # MNIST total classes (0-9 digits)
         self.lstm_layers = 2
-        self.using_sru = False
+        self.using_sru = sys.argv[1] == "SRU"
+	print("Using SRU" if self.using_sru else "Using LSTM")
 
         # tf Graph input
         self.X = tf.placeholder("float", [None, self.timesteps, self.num_input])
@@ -52,14 +54,14 @@ class Network(object):
 
         # Define a lstm cell with tensorflow    
         if self.using_sru:
-            rnn_cell = sru.SRUCell(self.num_hidden, False)
+            rnn_cell = lambda: sru.SRUCell(self.num_hidden, False)
         else:
-            rnn_cell = tf.nn.rnn_cell.LSTMCell(self.num_hidden, forget_bias=1.0)    
+            rnn_cell = lambda: tf.nn.rnn_cell.LSTMCell(self.num_hidden, forget_bias=1.0)    
 
-        cell_stack = tf.nn.rnn_cell.MultiRNNCell([rnn_cell] * self.lstm_layers, state_is_tuple=True)
+        cell_stack = tf.nn.rnn_cell.MultiRNNCell([rnn_cell() for _ in range(self.lstm_layers)], state_is_tuple=True)
 
         # Get lstm cell output
-        outputs, _ = tf.nn.rnn(cell_stack, x, dtype=tf.float32)
+        outputs, _ = tf.nn.static_rnn(cell_stack, x, dtype=tf.float32)
 
         # Linear activation, using rnn inner loop last output
         self.logits = tf.matmul(outputs[-1], weights['out']) + biases['out']
