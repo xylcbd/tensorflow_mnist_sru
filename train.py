@@ -101,7 +101,7 @@ def train():
     logits, prediction = network.get_output_ops()
 
     # Training Parameters
-    learning_rate = 0.01
+    learning_rate = 1e-2
     display_step = 100
     train_epochs = 3
     train_batchsize = 128    
@@ -111,12 +111,14 @@ def train():
     loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
         logits= logits, labels=Y))
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    #train_op = optimizer.minimize(loss_op)
+    # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9, use_nesterov=True)
+    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     grads = optimizer.compute_gradients(loss_op)
-    for i, (g, v) in enumerate(grads):
-        if g is not None:
-            grads[i] = (tf.clip_by_norm(g, 5), v)  # clip gradients
-    train_op = optimizer.apply_gradients(grads)
+    max_grad_norm = 1.0
+    tvars = tf.trainable_variables()
+    grads, _ = tf.clip_by_global_norm(tf.gradients(loss_op, tvars), max_grad_norm)
+    train_op = optimizer.apply_gradients(zip(grads, tvars))
+
 
     # Evaluate model (with test logits, for dropout to be disabled)
     correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
