@@ -4,6 +4,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import sru
 import time
 import os
+import sys
 import numpy as np
 
 ######################################
@@ -34,7 +35,8 @@ class Network(object):
         self.num_hidden = 128 # hidden layer num of features
         self.num_classes = 10 # MNIST total classes (0-9 digits)
         self.lstm_layers = 2
-        self.using_sru = False
+        self.using_sru = sys.argv[1] == "SRU"
+	print("Using SRU" if self.using_sru else "Using LSTM")
 
         # tf Graph input
         self.X = tf.placeholder("float", [None, self.timesteps, self.num_input])
@@ -52,14 +54,14 @@ class Network(object):
 
         # Define a lstm cell with tensorflow    
         if self.using_sru:
-            rnn_cell = sru.SRUCell(self.num_hidden, False)
+            rnn_cell = lambda: sru.SRUCell(self.num_hidden, False)
         else:
-            rnn_cell = tf.nn.rnn_cell.LSTMCell(self.num_hidden, forget_bias=1.0)    
+            rnn_cell = lambda: tf.nn.rnn_cell.LSTMCell(self.num_hidden, forget_bias=1.0)    
 
-        cell_stack = tf.nn.rnn_cell.MultiRNNCell([rnn_cell] * self.lstm_layers, state_is_tuple=True)
+        cell_stack = tf.nn.rnn_cell.MultiRNNCell([rnn_cell() for _ in range(self.lstm_layers)], state_is_tuple=True)
 
         # Get lstm cell output
-        outputs, _ = tf.nn.rnn(cell_stack, x, dtype=tf.float32)
+        outputs, _ = tf.nn.static_rnn(cell_stack, x, dtype=tf.float32)
 
         # Linear activation, using rnn inner loop last output
         self.logits = tf.matmul(outputs[-1], weights['out']) + biases['out']
@@ -99,7 +101,7 @@ def train():
     logits, prediction = network.get_output_ops()
 
     # Training Parameters
-    learning_rate = 0.01
+    learning_rate = 1e-2
     display_step = 100
     train_epochs = 3
     train_batchsize = 128    
@@ -109,12 +111,14 @@ def train():
     loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
         logits= logits, labels=Y))
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    #train_op = optimizer.minimize(loss_op)
+    # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9, use_nesterov=True)
+    # optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     grads = optimizer.compute_gradients(loss_op)
-    for i, (g, v) in enumerate(grads):
-        if g is not None:
-            grads[i] = (tf.clip_by_norm(g, 5), v)  # clip gradients
-    train_op = optimizer.apply_gradients(grads)
+    max_grad_norm = 1.0
+    tvars = tf.trainable_variables()
+    grads, _ = tf.clip_by_global_norm(tf.gradients(loss_op, tvars), max_grad_norm)
+    train_op = optimizer.apply_gradients(zip(grads, tvars))
+
 
     # Evaluate model (with test logits, for dropout to be disabled)
     correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
